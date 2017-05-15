@@ -52,7 +52,7 @@ The pickled data is a dictionary with 4 key/value pairs:
 n_train = len(train['features'])
 n_validation = len(valid['features'])
 n_test = len(test['features'])
-image_shape = [32, 32]
+image_shape = X_train[0].shape
 n_classes = len(list(set(train['labels'])))
 
 print("Number of training examples =", n_train)
@@ -65,7 +65,7 @@ print("Number of classes =", n_classes)
     Number of training examples = 34799
     Number of validation examples = 4410
     Number of testing examples = 12630
-    Image data shape = [32, 32]
+    Image data shape = (32, 32, 3)
     Number of classes = 43
     
 
@@ -150,7 +150,13 @@ plt.show()
 
 ### Pre-process the Data Set (normalization, grayscale, etc.)
 
-To preprocess images the `enhance_images` function was created. The images are simply converted to greyscale and normalized - this approach gave the beste efects during the tests. I tried other methods of enhancement (as commented out calhe method). Filtered images are presented below.
+To preprocess images the `enhance_images` function was created. Equalization of the images has three steps:
+ * color conversion (RGB to YUV)
+ * grayscale convertion
+ * normalization
+his approach gave the beste efects during the tests. This three overtures gave me the best results in tests.
+
+Filtered images are presented below.
 
 
 ```python
@@ -162,14 +168,15 @@ import numpy as np
 import cv2
 
 def enhance_images(arr):
-    arr = np.mean(arr, axis=-1, keepdims=True)
-    return (arr - 128) / 255
-#     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
-#     Xn = []
-#     for im in arr:
-#         im = cv2.cvtColor(im,cv2.COLOR_BGR2GRAY)
-#         Xn.append(clahe.apply(im))
-#     return np.expand_dims(Xn, axis=-1)
+#     arr = np.mean(arr, axis=-1, keepdims=True)
+#     return (arr - 128) / 255
+    Xn = []
+    for im in arr:
+        im = cv2.cvtColor(im, cv2.COLOR_BGR2YUV)
+        im = np.mean(im, axis=-1, keepdims=True)
+        im = (im - 128) / 255
+        Xn.append(im)
+    return Xn
 
 
 X_train = enhance_images(X_train)
@@ -188,16 +195,24 @@ show_random_signs(20, X_train, y_train)
 The base of this solution was LeNet function from previous listings. I modified the architecture to obtain the best validation results as I could. The neural network now consists of following steps:
 
  * Convolutional. Input = 32x32x1. Output = 28x28x6.
+     * large depth was used to learn a lot of characterisic attributes (such as shape, colours, etc) 
+     * standard stride was used to move the filter window of size 5x5 every 1 pixel each side
+     * it extracts image features
  * Relu activation.
+     * relu was chosen to increase non-linearity of the network
  * Convolutional. Input = 28x28x6. Output = 10x10x16.
  * Relu activation.
  * Pooling. Input = 10x10x16. Output = 5x5x16.
+     * used to downsample image, lowers up the detail number and parameters number
  * Flatten. Input = 11x11x16. Output = 400.
+     * in order to pass the data to fully connected layer we mast flatten the data
  * Fully Connected. Input = 400. Output = 120.
+     * after convolutional and pooling later we can reason the network
  * Relu activation.
  * Fully Connected. Input = 120. Output = 84.
  * Relu activation.
  * Fully Connected. Input = 84. Output = 43.
+     * three connected layers with relu are used instead of one to keep the non-linearity of the network 
 
 
 ```python
@@ -319,66 +334,66 @@ with tf.Session() as sess:
     Training...
     
     EPOCH 1 ...
-    Validation Accuracy = 0.833
+    Validation Accuracy = 0.839
     
     EPOCH 2 ...
-    Validation Accuracy = 0.890
+    Validation Accuracy = 0.891
     
     EPOCH 3 ...
-    Validation Accuracy = 0.926
+    Validation Accuracy = 0.893
     
     EPOCH 4 ...
-    Validation Accuracy = 0.920
+    Validation Accuracy = 0.914
     
     EPOCH 5 ...
-    Validation Accuracy = 0.936
+    Validation Accuracy = 0.929
     
     EPOCH 6 ...
-    Validation Accuracy = 0.921
+    Validation Accuracy = 0.915
     
     EPOCH 7 ...
-    Validation Accuracy = 0.938
+    Validation Accuracy = 0.922
     
     EPOCH 8 ...
-    Validation Accuracy = 0.933
+    Validation Accuracy = 0.934
     
     EPOCH 9 ...
-    Validation Accuracy = 0.937
+    Validation Accuracy = 0.925
     
     EPOCH 10 ...
-    Validation Accuracy = 0.931
-    
-    EPOCH 11 ...
     Validation Accuracy = 0.924
     
+    EPOCH 11 ...
+    Validation Accuracy = 0.945
+    
     EPOCH 12 ...
-    Validation Accuracy = 0.954
+    Validation Accuracy = 0.946
     
     EPOCH 13 ...
-    Validation Accuracy = 0.950
+    Validation Accuracy = 0.932
     
     EPOCH 14 ...
-    Validation Accuracy = 0.936
+    Validation Accuracy = 0.943
     
     EPOCH 15 ...
-    Validation Accuracy = 0.941
-    
-    EPOCH 16 ...
-    Validation Accuracy = 0.949
-    
-    EPOCH 17 ...
     Validation Accuracy = 0.937
     
+    EPOCH 16 ...
+    Validation Accuracy = 0.936
+    
+    EPOCH 17 ...
+    Validation Accuracy = 0.951
+    
     EPOCH 18 ...
-    Validation Accuracy = 0.954
+    Validation Accuracy = 0.948
     
     EPOCH 19 ...
-    Validation Accuracy = 0.955
-    
-    EPOCH 20 ...
     Validation Accuracy = 0.941
     
-    Test Accuracy = 0.924
+    EPOCH 20 ...
+    Validation Accuracy = 0.944
+    
+    Test Accuracy = 0.925
     Model saved
     
 
@@ -430,7 +445,7 @@ y_custom = [22, 25, 38, 12, 18, 2, 1]
 
 ### Predict the Sign Type for Each Image
 
-The custom signs were tested against the neural network. All of them were recognized correctly!
+The custom signs were tested against the neural network. One of them wasn't recognized correctly.
 
 
 ```python
@@ -464,37 +479,43 @@ with tf.Session() as sess:
     print("Test Accuracy = {:.1f}%".format(test_accuracy*100))
 ```
 
-    Test Accuracy = 100.0%
+    Test Accuracy = 85.7%
     
 
 ### Output Top 5 Softmax Probabilities For Each Image Found on the Web
 
-Two additional weaker matches were added to each sign title.
+Five additional weaker matches were added to each sign title.
 
 
 ```python
 def show_softmax(signs, props, indices):
-    fig = plt.figure(figsize=(8, 20))
+    fig = plt.figure(figsize=(8, 23))
     plots = len(signs)
     for img in range(plots):  
         a=fig.add_subplot(np.ceil(plots/2), 2, img+1)
         image = signs[img].squeeze()
         plt.imshow(image)
-        a.set_title("{} ({:.1f}%)\n{} ({:.1f}%)\n{} ({:.1f}%)".format(sign_dict[indices[img][0]], props[img][0], \
+        a.set_title("{} ({:.1f}%)\n{} ({:.1f}%)\n{} ({:.1f}%)\n{} ({:.1f}%)\n{} ({:.1f}%)".format(sign_dict[indices[img][0]], props[img][0], \
                                                       sign_dict[indices[img][1]], props[img][1], \
-                                                      sign_dict[indices[img][2]], props[img][2]))
+                                                      sign_dict[indices[img][2]], props[img][2], \
+                                                      sign_dict[indices[img][3]], props[img][3], \
+                                                      sign_dict[indices[img][4]], props[img][4]))
     plt.show()    
     
 
 with tf.Session() as sess:
     saver.restore(sess, './lenet') 
-    props, indices = sess.run(tf.nn.top_k(logits, k=3), feed_dict={x: X_custom})
+    props, indices = sess.run(tf.nn.top_k(logits, k=5), feed_dict={x: X_custom})
     show_softmax(X_custom, props, indices)
 ```
 
 
 ![png](output_30_0.png)
 
+
+As far as designed model recognized 85% of the signs, the certainty in some cases is low. However, the difference between the top choice and the next one is quite satisfactory. In the first case, the sign is pretty distorted and leaned so the whole certainty is low (15.4%) and the next, correct result is 0.4% lower accurate. In the rest of the cases, the first prediction has twice more probability as the next one. The overall probability of the matched sign could be higher. Only in good quality image (as in Keep right sign) the model hash very high certainty (over 80%). 
+
+The prediction speed limit (50 km/h) is pretty interesting. The sign is also distorted and askew (same as a Bumpy road), but the numbers on it are its characteristic attribute. Thanks to that the neural network recognizes it with almost 40% certainty.
 
 
 ```python
